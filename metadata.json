@@ -1,0 +1,5 @@
+{
+  "name": "Đối Chiếu Mã Excel",
+  "description": "Công cụ so sánh nhanh 2 cột dữ liệu (Mã KH và Thực tế), tô màu các mã không trùng và tạo danh sách mã lỗi.",
+  "requestFramePermissions": []
+}
