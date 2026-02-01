@@ -7,7 +7,7 @@
  * - false: Logs are hidden (Clean console).
  */
 
-export const ENABLE_LOGS = false;
+export const ENABLE_LOGS = true;
 
 export const log = (tag: string, message: string, ...args: any[]) => {
     if (ENABLE_LOGS) {

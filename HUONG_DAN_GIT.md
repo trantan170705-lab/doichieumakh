@@ -66,17 +66,21 @@ git push
 
 ### Lỗi: `remote origin already exists`
 Nghĩa là dự án đã có kết nối cũ. Sửa bằng cách:
-```bash
 git remote set-url origin https://github.com/trantan170705-lab/doichieumakh.git
 ```
 
-### Lỗi: `Updates were rejected...`
-Do trên GitHub có file mà máy bạn không có (thường do tạo README trên web trước).
-**Cách xử lý:**
+### Lỗi: `Updates were rejected` (Do GitHub có file lạ)
+Trường hợp này thường xảy ra khi tạo repository mới có sẵn file README/LICENSE.
+
+**Cách 1: Gộp code (Khuyên dùng)**
 ```bash
 git pull origin main --allow-unrelated-histories
 ```
-Hoặc nếu chắc chắn muốn ghi đè lên GitHub:
+
+**Cách 2: Ghi đè (Dùng khi Cách 1 lỗi hoặc code ở máy là chuẩn nhất)**
+Dùng lệnh này để ép GitHub phải giống hệt máy của bạn (Xóa lịch sử cũ trên GitHub đi):
+
 ```bash
 git push -f origin main
 ```
+*(Lưu ý: Chỉ dùng lệnh này khi bạn chắc chắn code trên máy tính là bản chuẩn nhất)*

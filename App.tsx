@@ -77,11 +77,11 @@ const App: React.FC = () => {
   const handleMetadataLoaded = React.useCallback((meta: { bankName?: string; transactionDate?: string }) => {
     log('App', `Metadata received:`, meta);
     setReportMetadata(prev => {
-      // If we already have a value, keep it, unless the new one provides something missing
-      // Or if B provides date but A didn't.
+      // Logic fix: Prefer NEW metadata (meta) over old metadata (prev).
+      // This allows replacing the bank name when uploading a new file.
       return {
-        bankName: prev.bankName || meta.bankName,
-        transactionDate: prev.transactionDate || meta.transactionDate
+        bankName: meta.bankName || prev.bankName,
+        transactionDate: meta.transactionDate || prev.transactionDate
       };
     });
   }, []);
