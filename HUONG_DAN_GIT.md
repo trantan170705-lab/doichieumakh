@@ -75,6 +75,8 @@ Trường hợp này thường xảy ra khi tạo repository mới có sẵn fil
 **Cách 1: Gộp code (Khuyên dùng)**
 ```bash
 git pull origin main --allow-unrelated-histories
+
+git push --set-upstream origin main
 ```
 
 **Cách 2: Ghi đè (Dùng khi Cách 1 lỗi hoặc code ở máy là chuẩn nhất)**
