@@ -31,6 +31,8 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
             let codeColIdx = -1;
             let amountColIdx = -1;
             let descColIdx = -1;
+            let nameColIdx = -1; // New: "Họ tên"
+            let billAmountColIdx = -1; // New: "Tổng tiền HĐ"
             let headerRowIdx = -1;
             let bankNameColIdx = -1;
             let transactionDateColIdx = -1;
@@ -209,13 +211,26 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                             log('VIETIN', `Found Code column at ${c} ("${cell}")`);
                             codeColIdx = c;
                         }
-                        // "Có / Credit" -> Amount
+                        // "Có / Credit" -> Amount (Standard)
                         // Note: Check for 'credit' but ensure it's not 'debit' if mixed, though usually separate cols
                         if (cell.includes('có / credit') || cell.includes('co / credit') || (cell.includes('credit') && !cell.includes('debit'))) {
                             log('VIETIN', `Found Amount column at ${c} ("${cell}")`);
                             amountColIdx = c;
                         }
-                        // "Tên tài khoản đối ứng/ Corresponsive name" -> Description (updated as per request)
+
+                        // "Tổng tiền HĐ" -> Bill Amount (Priority)
+                        if (cell.includes('tổng tiền hđ') || cell.includes('tong tien hd') || cell.includes('tổng tiền thanh toán') || cell.includes('tong tien thanh toan')) {
+                            log('VIETIN', `Found Bill Amount column at ${c} ("${cell}")`);
+                            billAmountColIdx = c;
+                        }
+
+                        // "Họ tên" -> Name (Priority Description)
+                        if (cell.includes('họ tên') || cell.includes('ho ten') || cell.includes('tên kh') || cell.includes('ten kh')) {
+                            log('VIETIN', `Found Name column at ${c} ("${cell}")`);
+                            nameColIdx = c;
+                        }
+
+                        // "Tên tài khoản đối ứng/ Corresponsive name" -> Description (Secondary)
                         if (cell.includes('tên tài khoản đối ứng') || cell.includes('ten tai khoan doi ung') || cell.includes('corresponsive name')) {
                             log('VIETIN', `Found Description column at ${c} ("${cell}")`);
                             descColIdx = c;
@@ -228,7 +243,7 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                     headerRowIdx = r;
                     // If we found headers, mark as Vietin format
                     isVietinFormat = true;
-                    log('VIETIN', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}, DescCol: ${descColIdx}`);
+                    log('VIETIN', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}, BillAmountCol: ${billAmountColIdx}, DescCol: ${descColIdx}, NameCol: ${nameColIdx}`);
                     // Removed break to allow vertical extraction
                 }
             }
@@ -243,7 +258,7 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                     fileName: fileName,
                     sheetName: sheetName,
                     data: [],
-                    error: "Không tìm thấy cột 'Mô tả giao dịch'",
+                    error: "Không tìm thấy cột 'Mô tả giao dịch' hoặc 'Mã KH'",
                     selected: false,
                     type: 'excel',
                     bankName: 'Ngân hàng VietinBank',
@@ -281,9 +296,17 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                 }
 
                 if (foundCode) {
-                    // Get amount - parse as number from "Có / Credit"
-                    if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
-                        const rawAmount = String(row[amountColIdx]);
+                    // Get amount
+                    // Priority: Bill Amount (Tổng tiền HĐ) > Amount (Có/Credit)
+                    let usedAmountColIdx = -1;
+                    if (billAmountColIdx >= 0 && row[billAmountColIdx] !== undefined) {
+                        usedAmountColIdx = billAmountColIdx;
+                    } else if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
+                        usedAmountColIdx = amountColIdx;
+                    }
+
+                    if (usedAmountColIdx >= 0) {
+                        const rawAmount = String(row[usedAmountColIdx]);
                         const numValue = parseFloat(rawAmount.replace(/[,\s]/g, ''));
                         if (!isNaN(numValue)) {
                             amount = Math.round(numValue).toLocaleString('en-US');
@@ -292,9 +315,17 @@ export const processVIETINWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                         }
                     }
 
-                    // Get description from "Số tài khoản đối ứng"
-                    if (descColIdx >= 0 && row[descColIdx] !== undefined) {
+                    // Get description
+                    // Priority: Name (Họ tên) > Corresponsive Name (Đối ứng) > Code Column (Fallback)
+                    if (nameColIdx >= 0 && row[nameColIdx] !== undefined) {
+                        description = String(row[nameColIdx]).trim();
+                    } else if (descColIdx >= 0 && row[descColIdx] !== undefined) {
                         description = String(row[descColIdx]).trim();
+                    }
+
+                    // Fallback: If description is STILL empty, use the code column value (Mô tả giao dịch)
+                    if ((!description || description === '') && codeColIdx >= 0 && row[codeColIdx]) {
+                        description = String(row[codeColIdx]).trim();
                     }
 
                     // ALLOW DUPLICATES: User wants to see ALL rows that have a code

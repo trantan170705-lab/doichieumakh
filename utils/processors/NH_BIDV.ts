@@ -32,6 +32,7 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
             let codeColIdx = -1;
             let amountColIdx = -1;
             let descColIdx = -1;
+            let nameColIdx = -1; // Track "Họ tên" column
             let headerRowIdx = -1;
             let bankNameColIdx = -1;
             let transactionDateColIdx = -1;
@@ -50,8 +51,6 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
             for (let r = 0; r < Math.min(data.length, 50); r++) {
                 const row = data[r];
                 if (!Array.isArray(row)) continue;
-
-
 
                 for (let c = 0; c < row.length; c++) {
                     const rawCell = String(row[c] || '').toLowerCase();
@@ -124,11 +123,9 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
 
                         if (isGenericCodeHeader) {
                             // Check for BIDV Branding
-                            // Look in current row + lookahead 7 rows
                             let hasBranding = (bankName && bankName.toLowerCase().includes('bidv')) || cell.includes('bidv');
 
                             if (!hasBranding) {
-                                // Check row content
                                 const rowContent = row.map(x => String(x || '')).join(' ').toLowerCase();
                                 if (rowContent.includes('bidv') || rowContent.includes('đầu tư và phát triển')) {
                                     hasBranding = true;
@@ -136,7 +133,6 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
                             }
 
                             if (!hasBranding) {
-                                // Lookahead
                                 const maxLookahead = Math.min(data.length, r + 8);
                                 for (let lr = r + 1; lr < maxLookahead; lr++) {
                                     const lRow = data[lr];
@@ -162,9 +158,13 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
                         if (cell.includes('số tiền') || cell.includes('so tien') || cell.includes('tổng tiền') || cell.includes('tong tien') || cell === 'amount') {
                             amountColIdx = c;
                         }
-                        // Description
+                        // Description (Ghi chú/Nội dung)
                         if (cell.includes('nội dung') || cell.includes('noi dung') || cell.includes('diễn giải') || cell.includes('dien giai') || cell.includes('ghi chú') || cell.includes('ghi chu') || cell === 'description') {
                             descColIdx = c;
+                        }
+                        // Name (Họ tên) - NEW PRIORITY
+                        if (cell.includes('họ tên') || cell.includes('ho ten') || cell === 'tên kh' || cell === 'ten kh') {
+                            nameColIdx = c;
                         }
                     }
                 }
@@ -172,14 +172,12 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
                 if (codeColIdx !== -1 && headerRowIdx === -1) {
                     headerRowIdx = r;
                     isBIDVFormat = true;
-                    log('BIDV', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}`);
-                    // Removed break
+                    log('BIDV', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, NameCol: ${nameColIdx}, DescCol: ${descColIdx}`);
                 }
             }
 
             if (headerRowIdx === -1) {
                 log('BIDV', `Header NOT found in sheet ${sheetName}`);
-                // Continue to next sheet
                 return;
             }
 
@@ -195,7 +193,6 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
 
                 if (codeColIdx >= 0 && row[codeColIdx]) {
                     const val = String(row[codeColIdx]).trim();
-                    // Match Xxxxxxx
                     const codeMatch = val.match(/X\d{6}/i);
                     if (codeMatch) {
                         foundCode = codeMatch[0].toUpperCase();
@@ -212,7 +209,11 @@ export const processBIDVWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
                             amount = rawAmount;
                         }
                     }
-                    if (descColIdx >= 0 && row[descColIdx] !== undefined) {
+
+                    // Priority: Name Column > Description Column
+                    if (nameColIdx >= 0 && row[nameColIdx] !== undefined) {
+                        description = String(row[nameColIdx]).trim();
+                    } else if (descColIdx >= 0 && row[descColIdx] !== undefined) {
                         description = String(row[descColIdx]).trim();
                     }
 

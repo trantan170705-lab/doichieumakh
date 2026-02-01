@@ -31,6 +31,8 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
             let codeColIdx = -1;
             let amountColIdx = -1;
             let descColIdx = -1;
+            let nameColIdx = -1; // New: "Họ tên"
+            let billAmountColIdx = -1; // New: "Tổng tiền HĐ"
             let headerRowIdx = -1;
             let bankNameColIdx = -1;
             let transactionDateColIdx = -1;
@@ -49,8 +51,6 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
             for (let r = 0; r < Math.min(data.length, 50); r++) {
                 const row = data[r];
                 if (!Array.isArray(row)) continue;
-
-
 
                 for (let c = 0; c < row.length; c++) {
                     const rawCell = String(row[c] || '').toLowerCase();
@@ -174,6 +174,18 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
                             log('VIETCOM', `Found Amount column at ${c} ("${cell}")`);
                             amountColIdx = c;
                         }
+
+                        // "Tổng tiền HĐ" -> Bill Amount (Priority)
+                        if (cell.includes('tổng tiền hđ') || cell.includes('tong tien hd') || cell.includes('tổng tiền thanh toán') || cell.includes('tong tien thanh toan')) {
+                            log('VIETCOM', `Found Bill Amount column at ${c} ("${cell}")`);
+                            billAmountColIdx = c;
+                        }
+
+                        // "Họ tên" -> Name (Priority Description)
+                        if (cell.includes('họ tên') || cell.includes('ho ten') || cell.includes('tên kh') || cell.includes('ten kh') || cell.includes('người nộp') || cell.includes('nguoi nop')) {
+                            log('VIETCOM', `Found Name column at ${c} ("${cell}")`);
+                            nameColIdx = c;
+                        }
                     }
                 }
 
@@ -181,7 +193,7 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
                     headerRowIdx = r;
                     // If we found headers, mark as Vietcom format
                     isVietcomFormat = true;
-                    log('VIETCOM', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}`);
+                    log('VIETCOM', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}, NameCol: ${nameColIdx}, BillAmtCol: ${billAmountColIdx}`);
                     // Removed break
                 }
             }
@@ -224,14 +236,14 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
                         foundCode = codeMatch[0].toUpperCase();
                     }
 
-                    // 2. Extract Description: Remove prefix "MBVCB..._GENPCO_"
-                    // Example: "MBVCB.12800478724_20260129_GENPCO_TA THI MY HANH..." -> "TA THI MY HANH..."
+                    // 2. Extract Description (Standard)
+                    // Remove prefix "MBVCB..._GENPCO_"
                     if (val.includes('GENPCO_')) {
                         const parts = val.split('GENPCO_');
-                        if (parts.length > 1) {
+                        if (parts.length > 1 && parts[1].trim().length > 0) {
                             description = parts[1].trim();
                         } else {
-                            description = val;
+                            description = val; // Fallback: Use full value if split result is empty
                         }
                     } else {
                         description = val;
@@ -240,14 +252,31 @@ export const processVIETCOMWorkbook = (wb: XLSX.WorkBook, fileName: string, extr
 
                 if (foundCode) {
                     // Get amount
-                    if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
-                        const rawAmount = String(row[amountColIdx]);
+                    // Priority: Bill Amount > Amount
+                    let usedAmountColIdx = -1;
+                    if (billAmountColIdx >= 0 && row[billAmountColIdx] !== undefined) {
+                        usedAmountColIdx = billAmountColIdx;
+                    } else if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
+                        usedAmountColIdx = amountColIdx;
+                    }
+
+                    if (usedAmountColIdx >= 0) {
+                        const rawAmount = String(row[usedAmountColIdx]);
                         // Remove commas, spaces
                         const numValue = parseFloat(rawAmount.replace(/[,\s]/g, ''));
                         if (!isNaN(numValue)) {
                             amount = Math.round(numValue).toLocaleString('en-US');
                         } else {
                             amount = rawAmount;
+                        }
+                    }
+
+                    // Get description
+                    // Priority: Name (Họ tên) > Description (Mô tả genpco)
+                    if (nameColIdx >= 0 && row[nameColIdx] !== undefined) {
+                        const nameVal = String(row[nameColIdx]).trim();
+                        if (nameVal && nameVal.length > 0) {
+                            description = nameVal;
                         }
                     }
 

@@ -30,6 +30,8 @@ export const processLPWorkbook = (wb: XLSX.WorkBook, fileName: string, extractMe
             let codeColIdx = -1;
             let amountColIdx = -1;
             let descColIdx = -1;
+            let nameColIdx = -1; // New: "Họ tên"
+            let billAmountColIdx = -1; // New: "Tổng tiền HĐ"
             let headerRowIdx = -1;
             let bankNameColIdx = -1;
             let transactionDateColIdx = -1;
@@ -186,6 +188,19 @@ export const processLPWorkbook = (wb: XLSX.WorkBook, fileName: string, extractMe
                             log('LP', `Found Amount column at ${c} ("${cell}")`);
                             amountColIdx = c;
                         }
+
+                        // "Tổng tiền HĐ" -> Bill Amount (Priority)
+                        if (cell.includes('tổng tiền hđ') || cell.includes('tong tien hd') || cell.includes('tổng tiền thanh toán') || cell.includes('tong tien thanh toan')) {
+                            log('LP', `Found Bill Amount column at ${c} ("${cell}")`);
+                            billAmountColIdx = c;
+                        }
+
+                        // "Họ tên" -> Name (Priority Description)
+                        if (cell.includes('họ tên') || cell.includes('ho ten') || cell.includes('tên kh') || cell.includes('ten kh') || cell.includes('người nộp') || cell.includes('nguoi nop')) {
+                            log('LP', `Found Name column at ${c} ("${cell}")`);
+                            nameColIdx = c;
+                        }
+
                         // Description
                         if (cell.includes('diễn giải') || cell.includes('nội dung') || cell.includes('transaction description')) {
                             log('LP', `Found Description column at ${c} ("${cell}")`);
@@ -198,7 +213,7 @@ export const processLPWorkbook = (wb: XLSX.WorkBook, fileName: string, extractMe
                     headerRowIdx = r;
                     // If we found headers, mark as LP format
                     isLPFormat = true;
-                    log('LP', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}, DescCol: ${descColIdx}`);
+                    log('LP', `Header ACCEPTED at row ${r}. CodeCol: ${codeColIdx}, AmountCol: ${amountColIdx}, DescCol: ${descColIdx}, NameCol: ${nameColIdx}, BillCol: ${billAmountColIdx}`);
                     // Removed break
                 }
             }
@@ -244,34 +259,43 @@ export const processLPWorkbook = (wb: XLSX.WorkBook, fileName: string, extractMe
 
                     // If we haven't found a code yet (e.g. Code col was CIF No, or Description col didn't have X code directly), 
                     // AND we have a separate Description column (or if the Code column ITSELF was the description column), check there.
-                    if (!foundCode) {
-                        // Check descColIdx if it exists
-                        if (descColIdx >= 0 && row[descColIdx]) {
-                            const descVal = String(row[descColIdx]);
-                            const descMatch = descVal.match(/X\d{6}/i);
-                            if (descMatch) {
-                                foundCode = descMatch[0].toUpperCase();
-                                description = descVal; // The decription IS the source
-                            }
-                        }
-                        // Also, if codeColIdx was "Nội dung giao dịch", we already checked it above (val).
+                    // Priority: Explicit Description Column > Code Column (fallback)
+
+                    // 1. Try Description Column first
+                    // 1. Try Name Column (Highest Priority)
+                    if (nameColIdx >= 0 && row[nameColIdx]) {
+                        description = String(row[nameColIdx]).trim();
                     }
 
-                    if (foundCode && !description && codeColIdx >= 0) {
-                        // If found code in "Mã KH" column, try to get description from "Họ tên" or "Địa chỉ" if we could find them... 
-                        // But for now just use the Code column value or empty
+                    // 2. Try Description Column
+                    if ((!description || description === '') && descColIdx >= 0 && row[descColIdx]) {
+                        description = String(row[descColIdx]).trim();
+                    }
+
+                    // 2. If valid code found in code column, but no description yet (or empty), check code column for description??
+                    // Actually, if we have a valid code, the Code Column usually *contains* the code. 
+                    // If the code column IS "Nội dung giao dịch", then `val` already has the description.
+
+                    if (!description && codeColIdx >= 0 && row[codeColIdx]) {
                         const val = String(row[codeColIdx]).trim();
-                        if (val.length > foundCode.length + 5) {
-                            description = val; // Likely a description line
-                        } else if (descColIdx >= 0 && row[descColIdx]) {
-                            description = String(row[descColIdx]);
+                        // Only use as description if it's long enough to be a description, or if descColIdx was missing entirely
+                        if (val.length > (foundCode ? foundCode.length + 5 : 10)) {
+                            description = val;
                         }
                     }
                 }
 
                 if (foundCode) {
-                    if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
-                        const rawAmount = String(row[amountColIdx]);
+                    // Priority: Bill Amount > Amount
+                    let usedAmountColIdx = -1;
+                    if (billAmountColIdx >= 0 && row[billAmountColIdx] !== undefined) {
+                        usedAmountColIdx = billAmountColIdx;
+                    } else if (amountColIdx >= 0 && row[amountColIdx] !== undefined) {
+                        usedAmountColIdx = amountColIdx;
+                    }
+
+                    if (usedAmountColIdx >= 0) {
+                        const rawAmount = String(row[usedAmountColIdx]);
                         const numValue = parseFloat(rawAmount.replace(/[,\s]/g, ''));
                         if (!isNaN(numValue)) {
                             amount = Math.round(numValue).toLocaleString('en-US');
