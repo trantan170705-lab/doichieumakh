@@ -7,6 +7,7 @@ import { processAGRIWorkbook } from '../utils/processors/NH_AGRI';
 import { processVIETINWorkbook } from '../utils/processors/NH_VIETIN';
 import { processVIETCOMWorkbook } from '../utils/processors/NH_VIETCOM';
 import { processLPWorkbook } from '../utils/processors/NH_LP';
+import { processSACOMWorkbook } from '../utils/processors/NH_SACOM';
 import { readExcelWorkbook, getHeaders } from '../utils/excelHelper';
 
 interface FileUploaderProps {
@@ -118,15 +119,22 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                             if (lpResults) {
                                 newSheets.push(...lpResults);
                             } else {
-                                // Try processing as BIDV
-                                const bidvResults = processBIDVWorkbook(wb, file.name, extractMetadata);
+                                // Try processing as Sacombank
+                                const sacomResults = processSACOMWorkbook(wb, file.name, extractMetadata);
 
-                                if (bidvResults) {
-                                    newSheets.push(...bidvResults);
+                                if (sacomResults) {
+                                    newSheets.push(...sacomResults);
                                 } else {
-                                    // Fallback to Agribank (generic format)
-                                    const agriResults = processAGRIWorkbook(wb, file.name, extractMetadata);
-                                    newSheets.push(...agriResults);
+                                    // Try processing as BIDV
+                                    const bidvResults = processBIDVWorkbook(wb, file.name, extractMetadata);
+
+                                    if (bidvResults) {
+                                        newSheets.push(...bidvResults);
+                                    } else {
+                                        // Fallback to Agribank (generic format)
+                                        const agriResults = processAGRIWorkbook(wb, file.name, extractMetadata);
+                                        newSheets.push(...agriResults);
+                                    }
                                 }
                             }
                         }

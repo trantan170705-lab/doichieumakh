@@ -215,10 +215,10 @@ const App: React.FC = () => {
             <p className="text-gray-500 mt-1 max-w-md mx-auto">
               Dán 2 cột Excel vào ô bên trên và bấm "So Sánh Ngay" để tìm ra các mã bị thiếu hoặc sai lệch.
             </p>
-            <div className="mt-6 pt-6 border-t border-gray-100 max-w-sm mx-auto">
+            <div className="mt-6 pt-6 border-t border-gray-100 max-w-2xl mx-auto">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Hỗ trợ nhận diện tự động:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Agribank'].map(bank => (
+                {['VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Sacombank', 'Agribank'].map(bank => (
                   <span key={bank} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md border border-gray-200">
                     {bank}
                   </span>

@@ -8,7 +8,7 @@
   - 📋 **Dán trực tiếp:** Copy danh sách từ Excel, Text file và dán vào ô nhập liệu.
   - 📁 **Nạp file Excel:** Hỗ trợ kéo thả hoặc chọn file `.xlsx`, `.xls`, `.csv`. 
   - 🤖 **Tự động nhận diện:** Thuật toán thông minh tự động tìm cột chứa "Mã KH" (dạng `X012345`) trong file Excel nhiều sheet.
-  - 🏦 **Hỗ trơ Ngân hàng:** Tự động nhận diện và xử lý định dạng sao kê của: **VietinBank, Vietcombank, BIDV, Agribank, LPBank**.
+  - 🏦 **Hỗ trơ Ngân hàng:** Tự động nhận diện và xử lý định dạng sao kê của: **VietinBank, Vietcombank, BIDV, Agribank, LPBank, Sacombank**.
     - *Ưu tiên lấy cột "Họ tên" làm Diễn giải và "Tổng tiền HĐ" làm Số tiền.*
 - **So Sánh Tức Thì:** Xử lý hàng nghìn dòng dữ liệu chỉ trong tích tắc.
 - **Phân Tích Chi Tiết:**
