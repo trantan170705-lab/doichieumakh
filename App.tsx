@@ -218,7 +218,7 @@ const App: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-gray-100 max-w-2xl mx-auto">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Hỗ trợ nhận diện tự động:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Sacombank', 'Agribank'].map(bank => (
+                {['VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Sacombank', 'Agribank', 'Ví Payoo', 'Ví VNPT', 'Ví Momo'].map(bank => (
                   <span key={bank} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md border border-gray-200">
                     {bank}
                   </span>

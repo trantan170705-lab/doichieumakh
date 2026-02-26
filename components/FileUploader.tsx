@@ -8,6 +8,9 @@ import { processVIETINWorkbook } from '../utils/processors/NH_VIETIN';
 import { processVIETCOMWorkbook } from '../utils/processors/NH_VIETCOM';
 import { processLPWorkbook } from '../utils/processors/NH_LP';
 import { processSACOMWorkbook } from '../utils/processors/NH_SACOM';
+import { processVIPAYOOWorkbook } from '../utils/processors/VI_PAYOO';
+import { processVIVNPTWorkbook } from '../utils/processors/VI_VNPT';
+import { processVIMOMOWorkbook } from '../utils/processors/VI_MOMO';
 import { readExcelWorkbook, getHeaders } from '../utils/excelHelper';
 
 interface FileUploaderProps {
@@ -125,15 +128,36 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                                 if (sacomResults) {
                                     newSheets.push(...sacomResults);
                                 } else {
-                                    // Try processing as BIDV
-                                    const bidvResults = processBIDVWorkbook(wb, file.name, extractMetadata);
+                                    // Try processing as Ví Payoo
+                                    const viPayooResults = processVIPAYOOWorkbook(wb, file.name, extractMetadata);
 
-                                    if (bidvResults) {
-                                        newSheets.push(...bidvResults);
+                                    if (viPayooResults) {
+                                        newSheets.push(...viPayooResults);
                                     } else {
-                                        // Fallback to Agribank (generic format)
-                                        const agriResults = processAGRIWorkbook(wb, file.name, extractMetadata);
-                                        newSheets.push(...agriResults);
+                                        // Try processing as Ví VNPT
+                                        const viVNPTResults = processVIVNPTWorkbook(wb, file.name, extractMetadata);
+
+                                        if (viVNPTResults) {
+                                            newSheets.push(...viVNPTResults);
+                                        } else {
+                                            // Try processing as Ví Momo
+                                            const viMomoResults = processVIMOMOWorkbook(wb, file.name, extractMetadata);
+
+                                            if (viMomoResults) {
+                                                newSheets.push(...viMomoResults);
+                                            } else {
+                                                // Try processing as BIDV
+                                                const bidvResults = processBIDVWorkbook(wb, file.name, extractMetadata);
+
+                                                if (bidvResults) {
+                                                    newSheets.push(...bidvResults);
+                                                } else {
+                                                    // Fallback to Agribank (generic format)
+                                                    const agriResults = processAGRIWorkbook(wb, file.name, extractMetadata);
+                                                    newSheets.push(...agriResults);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -160,7 +160,7 @@ export const processAGRIWorkbook = (wb: XLSX.WorkBook, fileName: string, extract
                     }
                 }
 
-                if (codeColIdx !== -1) {
+                if (codeColIdx !== -1 && headerRowIdx === -1) {
                     headerRowIdx = r;
                     // Do NOT break here immediately if we still need to find metadata vertically
                     // But we might want to break if we are sure we found the header row and we rely on vertical search for metadata
