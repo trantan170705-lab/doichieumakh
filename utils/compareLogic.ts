@@ -8,54 +8,96 @@ export const compareLists = (rawA: string, rawB: string): ComparisonResult => {
   const listA = cleanInput(rawA);
   const listB = cleanInput(rawB);
 
-  // Create Sets for O(1) lookups based on non-empty values
-  // We use a normalized set (uppercase) for comparison to be case-insensitive if desired,
-  // but strictly speaking, codes might be case-sensitive. Let's assume case-sensitive for exact match
-  // unless we want to be lenient. Let's do exact match but trim whitespace.
-  const validSetA = new Set(listA.filter(Boolean));
-  const validSetB = new Set(listB.filter(Boolean));
-
-  // Determine duplicates
-  const seenA = new Set<string>();
-  const processedA: ProcessedItem[] = listA.map((val, idx) => {
-    const isDup = seenA.has(val) && !!val;
-    if (val) seenA.add(val);
-    return {
-      value: val,
-      originalIndex: idx,
-      existsInOther: validSetB.has(val),
-      isValid: !!val,
-      isDuplicate: isDup
-    };
+  // Frequency map for A
+  const expectedA = new Map<string, number>();
+  listA.filter(Boolean).forEach(x => {
+    expectedA.set(x, (expectedA.get(x) || 0) + 1);
   });
 
-  const seenB = new Set<string>();
+  const matchedA = new Map<string, number>();
+
+  const inBOnly: string[] = [];
+  const intersection: string[] = [];
+
   const processedB: ProcessedItem[] = listB.map((val, idx) => {
-    const isDup = seenB.has(val) && !!val;
-    if (val) seenB.add(val);
+    if (!val) {
+      return { value: val, originalIndex: idx, existsInOther: false, isValid: false, isDuplicate: false };
+    }
+
+    const expected = expectedA.get(val) || 0;
+    const matched = matchedA.get(val) || 0;
+
+    let isMatch = false;
+    if (matched < expected) {
+      isMatch = true;
+      intersection.push(val);
+      matchedA.set(val, matched + 1);
+    } else {
+      // It exceeds the expected count in A, or doesn't exist in A
+      inBOnly.push(val);
+    }
+
     return {
       value: val,
       originalIndex: idx,
-      existsInOther: validSetA.has(val),
-      isValid: !!val,
-      isDuplicate: isDup
+      existsInOther: isMatch,
+      isValid: true,
+      isDuplicate: false // computed below
     };
   });
 
-  // Calculate differences
-  // Preserve duplicates in Missing/Extra lists as per user request
-  const inAOnly = listA.filter(x => x && !validSetB.has(x));
-  const inBOnly = listB.filter(x => x && !validSetA.has(x));
+  // Compute isDuplicate for processedB based on appearance in B
+  const seenB = new Set<string>();
+  processedB.forEach(p => {
+    if (p.isValid) {
+      p.isDuplicate = seenB.has(p.value);
+      seenB.add(p.value);
+    }
+  });
 
-  // Intersection usually implies unique common items for summary
-  const intersection = Array.from(validSetA).filter(x => validSetB.has(x));
+  const inAOnly: string[] = [];
+  const usedA = new Map<string, number>();
+
+  const processedA: ProcessedItem[] = listA.map((val, idx) => {
+    if (!val) {
+      return { value: val, originalIndex: idx, existsInOther: false, isValid: false, isDuplicate: false };
+    }
+
+    const totalMatched = matchedA.get(val) || 0;
+    const used = usedA.get(val) || 0;
+
+    let isMatch = false;
+    if (used < totalMatched) {
+      isMatch = true;
+      usedA.set(val, used + 1);
+    } else {
+      // It was expected but never matched from B
+      inAOnly.push(val);
+    }
+
+    return {
+      value: val,
+      originalIndex: idx,
+      existsInOther: isMatch,
+      isValid: true,
+      isDuplicate: false // computed below
+    };
+  });
+
+  const seenA = new Set<string>();
+  processedA.forEach(p => {
+    if (p.isValid) {
+      p.isDuplicate = seenA.has(p.value);
+      seenA.add(p.value);
+    }
+  });
 
   return {
     inAOnly,
     inBOnly,
     intersection,
-    totalA: validSetA.size,
-    totalB: validSetB.size,
+    totalA: listA.filter(Boolean).length,
+    totalB: listB.filter(Boolean).length,
     processedA,
     processedB
   };

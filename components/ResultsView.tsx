@@ -104,7 +104,14 @@ const MissingList: React.FC<MissingListProps> = ({ items, title, subtitle, color
   const handleExport = () => {
     if (!enrichedData || enrichedData.length === 0) {
       // Fallback: export codes only
-      const data = items.map(code => ({ code, amount: null, description: '' }));
+      const frequencyMap = new Map<string, number>();
+      items.forEach(code => frequencyMap.set(code, (frequencyMap.get(code) || 0) + 1));
+
+      const data = items.map(code => {
+        const count = frequencyMap.get(code) || 1;
+        const note = count > 1 ? `Chuyển đúp (${count} lần)` : '';
+        return { code, amount: null, description: '', note };
+      });
       exportToExcel(data, exportFilename, codeHeader);
       return;
     }
@@ -113,9 +120,16 @@ const MissingList: React.FC<MissingListProps> = ({ items, title, subtitle, color
     const dataMap = new Map<string, EnrichedCodeData>();
     enrichedData.forEach(d => dataMap.set(d.code, d));
 
-    // Build export data with amounts as numbers
+    // Create a frequency map
+    const frequencyMap = new Map<string, number>();
+    items.forEach(code => frequencyMap.set(code, (frequencyMap.get(code) || 0) + 1));
+
+    // Build export data with amounts as numbers and notes
     const exportData = items.map(code => {
       const enriched = dataMap.get(code);
+      const count = frequencyMap.get(code) || 1;
+      const note = count > 1 ? `Chuyển đúp (${count} lần)` : '';
+
       // Parse amount string to number (remove commas)
       let amountNum: number | null = null;
       if (enriched?.amount) {
@@ -127,7 +141,8 @@ const MissingList: React.FC<MissingListProps> = ({ items, title, subtitle, color
       return {
         code,
         amount: amountNum,
-        description: enriched?.description || ''
+        description: enriched?.description || '',
+        note
       };
     });
 
@@ -174,7 +189,7 @@ const MissingList: React.FC<MissingListProps> = ({ items, title, subtitle, color
 };
 
 // Helper function to export data to Excel with proper number formatting
-const exportToExcel = (data: { code: string; amount: number | null; description: string }[], filename: string, codeHeader: string) => {
+const exportToExcel = (data: { code: string; amount: number | null; description: string; note?: string }[], filename: string, codeHeader: string) => {
   // Calculate total
   const totalAmount = data.reduce((sum, row) => sum + (row.amount || 0), 0);
 
@@ -182,14 +197,16 @@ const exportToExcel = (data: { code: string; amount: number | null; description:
   const exportRows = data.map(row => ({
     [codeHeader]: row.code,
     'Số tiền': row.amount,
-    'Diễn giải/Nội dung': row.description
+    'Diễn giải/Nội dung': row.description,
+    'Ghi chú': row.note || ''
   }));
 
   // Add total row
   exportRows.push({
     [codeHeader]: 'TỔNG CỘNG',
     'Số tiền': totalAmount,
-    'Diễn giải/Nội dung': `${data.length} mã thừa/lạ`
+    'Diễn giải/Nội dung': `${data.length} mã`,
+    'Ghi chú': ''
   });
 
   const ws = XLSX.utils.json_to_sheet(exportRows);

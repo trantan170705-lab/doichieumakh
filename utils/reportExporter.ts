@@ -47,15 +47,25 @@ export const exportMasterReport = ({
     XLSX.utils.book_append_sheet(wb, wsSummary, "TongHop");
 
     // --- Sheet 2: Chi Tiết (Details) ---
-    // Merge all codes into a single list map for easy lookup
-    // We want to list ALL unique codes involved.
-    const allCodes = new Set([
-        ...results.intersection,
-        ...results.inAOnly,
-        ...results.inBOnly
-    ]);
+    // We want to list ALL occurrences involved instead of unique codes
+    // so that duplicated "Mã thừa" transfers are fully visible.
+    const allItems: { code: string; status: string; statusGroup: string }[] = [];
 
-    const sortedCodes = Array.from(allCodes).sort();
+    // Create frequency map to identify duplicates across all results
+    const frequencyMap = new Map<string, number>();
+
+    // Add all items and count them
+    const recordItem = (code: string, status: string, statusGroup: string) => {
+        allItems.push({ code, status, statusGroup });
+        frequencyMap.set(code, (frequencyMap.get(code) || 0) + 1);
+    };
+
+    results.intersection.forEach(code => recordItem(code, 'Khớp', 'MATCH'));
+    results.inAOnly.forEach(code => recordItem(code, `Thiếu trong ${labelB}`, 'MISSING'));
+    results.inBOnly.forEach(code => recordItem(code, `Thừa trong ${labelB}`, 'EXTRA'));
+
+    // Sort to group identical codes together
+    allItems.sort((a, b) => a.code.localeCompare(b.code));
 
     // Helper to get enriched data
     const mapA = new Map(enrichedDataA.map(d => [d.code, d]));
@@ -67,33 +77,21 @@ export const exportMasterReport = ({
         return isNaN(num) ? 0 : num;
     };
 
-    const detailRows = sortedCodes.map((code, index) => {
-        let status = '';
-        let statusGroup = ''; // For sorting/grouping if needed
-
-        if (results.intersection.includes(code)) {
-            status = 'Khớp';
-            statusGroup = 'MATCH';
-        } else if (results.inAOnly.includes(code)) {
-            status = `Thiếu trong ${labelB}`;
-            statusGroup = 'MISSING';
-        } else {
-            status = `Thừa trong ${labelB}`; // inBOnly
-            statusGroup = 'EXTRA';
-        }
-
-        const infoA = mapA.get(code);
-        const infoB = mapB.get(code);
+    const detailRows = allItems.map((item, index) => {
+        const infoA = mapA.get(item.code);
+        const infoB = mapB.get(item.code);
+        const count = frequencyMap.get(item.code) || 1;
+        const note = count > 1 ? `Chuyển đúp (${count} lần)` : '';
 
         return {
             'STT': index + 1,
-            'Mã KH': code,
-            'Trạng Thái': status,
+            'Mã KH': item.code,
+            'Trạng Thái': item.status,
             [`Số tiền (${labelA})`]: parseAmount(infoA?.amount),
             [`Diễn giải (${labelA})`]: infoA?.description || '',
             [`Số tiền (${labelB})`]: parseAmount(infoB?.amount),
             [`Diễn giải (${labelB})`]: infoB?.description || '',
-            'Ghi chú': ''
+            'Ghi chú': note
         };
     });
 
@@ -119,21 +117,22 @@ export const exportMasterReport = ({
     // Always create sheet even if empty
     const missingRows = results.inAOnly.map((code, idx) => {
         const info = mapA.get(code);
+        const count = frequencyMap.get(code) || 1;
+        const note = count > 1 ? `Chuyển đúp (${count} lần)` : '';
+
         return {
             'STT': idx + 1,
             'Mã KH': code,
             'Diễn giải': info?.description || '',
-            'Số tiền': parseAmount(info?.amount)
+            'Số tiền': parseAmount(info?.amount),
+            'Ghi chú': note
         };
     });
     const wsMissing = XLSX.utils.json_to_sheet(missingRows.length > 0 ? missingRows : [{}]);
-    // If empty, json_to_sheet makes a weird sheet, let's just make it empty with headers if we can, 
-    // but for simplicity, if empty, we might get an empty sheet or headerless. 
-    // Better to handle empty properly.
     if (missingRows.length === 0) {
-        XLSX.utils.sheet_add_aoa(wsMissing, [['STT', 'Mã KH', 'Diễn giải', 'Số tiền']], { origin: "A1" });
+        XLSX.utils.sheet_add_aoa(wsMissing, [['STT', 'Mã KH', 'Diễn giải', 'Số tiền', 'Ghi chú']], { origin: "A1" });
     }
-    wsMissing['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 40 }, { wch: 15 }];
+    wsMissing['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, wsMissing, "Thieu_Trong_ThucTe");
 
 
@@ -141,18 +140,22 @@ export const exportMasterReport = ({
     // Always create sheet even if empty
     const extraRows = results.inBOnly.map((code, idx) => {
         const info = mapB.get(code);
+        const count = frequencyMap.get(code) || 1;
+        const note = count > 1 ? `Chuyển đúp (${count} lần)` : '';
+
         return {
             'STT': idx + 1,
             'Mã KH': code,
             'Diễn giải': info?.description || '',
-            'Số tiền': parseAmount(info?.amount)
+            'Số tiền': parseAmount(info?.amount),
+            'Ghi chú': note
         };
     });
     const wsExtra = XLSX.utils.json_to_sheet(extraRows.length > 0 ? extraRows : [{}]);
     if (extraRows.length === 0) {
-        XLSX.utils.sheet_add_aoa(wsExtra, [['STT', 'Mã KH', 'Diễn giải', 'Số tiền']], { origin: "A1" });
+        XLSX.utils.sheet_add_aoa(wsExtra, [['STT', 'Mã KH', 'Diễn giải', 'Số tiền', 'Ghi chú']], { origin: "A1" });
     }
-    wsExtra['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 40 }, { wch: 15 }];
+    wsExtra['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, wsExtra, "Thua_Trong_ThucTe");
 
 
