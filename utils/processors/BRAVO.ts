@@ -33,6 +33,17 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
         } else {
             let descColIdx = -1;
             let debtColIdx = -1; // Nợ (Amount logic)
+            let dateColIdx = -1; // Ngày (cho Tên báo cáo)
+
+            const formatExcelDate = (val: any): string | undefined => {
+                if (typeof val === 'number' && val > 30000 && val < 60000) {
+                    const date = XLSX.SSF.parse_date_code(val);
+                    const d = date.d < 10 ? `0${date.d}` : date.d;
+                    const m = date.m < 10 ? `0${date.m}` : date.m;
+                    return `${d}/${m}/${date.y}`;
+                }
+                return undefined;
+            };
 
             // Search for header columns in first 20 rows
             // Bravo sometimes splits headers into 2 rows, "Phát sinh" merged on top of "Nợ" & "Có"
@@ -57,6 +68,13 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
                             debtColIdx = c;
                         }
                     }
+
+                    // "Ngày" chứng từ
+                    if (cell === 'ngày' || cell === 'ngày chứng từ' || cell.includes('ngày g/d')) {
+                        if (dateColIdx === -1) {
+                            dateColIdx = c;
+                        }
+                    }
                 }
             }
 
@@ -75,7 +93,7 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
 
                 if (hasBravoHint || fileName.toLowerCase().includes('bravo')) {
                     isBravoFormat = true;
-                    log('BRAVO', `Identified Bravo format. Desc: ${descColIdx}, Debt (Nợ): ${debtColIdx}`);
+                    log('BRAVO', `Identified Bravo format. Desc: ${descColIdx}, Debt: ${debtColIdx}, Date: ${dateColIdx}`);
                 }
             }
 
@@ -93,10 +111,10 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
                 // 1. Extract Description & Code
                 if (descColIdx >= 0 && row[descColIdx]) {
                     const rawDesc = String(row[descColIdx]).trim();
-                    
+
                     // Ex: PAYOO : Thu hộ tiền nước kỳ 2/2026 | DANG THANH DUC | X050606 | XI0J001800 | | Lý Xuân Đào
                     const parts = rawDesc.split('|').map(p => p.trim());
-                    
+
                     let foundCodeIdx = -1;
                     for (let i = 0; i < parts.length; i++) {
                         // Looking for exact "X" + 6 digits in any of the segments
@@ -108,11 +126,11 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
 
                     if (foundCodeIdx !== -1) {
                         foundCode = parts[foundCodeIdx].toUpperCase(); // E.g., X050606
-                        
+
                         // User requested: "Tách ra chỉ lấy DANG THANH DUC"
                         // Usually the previous part in the segment holds the Name
                         if (foundCodeIdx > 0) {
-                            description = parts[foundCodeIdx - 1]; 
+                            description = parts[foundCodeIdx - 1];
                             if (!description || description === '') {
                                 // Fallback
                                 description = rawDesc;
@@ -140,6 +158,24 @@ export const processBRAVOWorkbook = (wb: XLSX.WorkBook, fileName: string, extrac
                             amount = Math.round(numValue).toLocaleString('en-US');
                         } else {
                             amount = rawAmount;
+                        }
+                    }
+                }
+
+                // 3. Extract Date (cho metadata tính tên file báo cáo)
+                if (extractMetadata && !transactionDate && dateColIdx >= 0 && row[dateColIdx]) {
+                    const val = row[dateColIdx];
+                    const excelDate = formatExcelDate(val);
+                    if (excelDate) {
+                        transactionDate = excelDate;
+                    } else {
+                        // Text date "01-03-26" -> we might need to change it to "01/03/2026" or format string
+                        const sVal = String(val).trim();
+                        const parts = sVal.split(/[\s-]/);
+                        if (parts.length >= 3 && /\d{2}/.test(parts[0])) {
+                            transactionDate = `${parts[0]}/${parts[1]}/${parts[2]}`; // fallback string mapping
+                        } else {
+                            transactionDate = sVal;
                         }
                     }
                 }

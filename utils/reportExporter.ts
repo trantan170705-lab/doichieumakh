@@ -160,36 +160,45 @@ export const exportMasterReport = ({
 
 
     // Write file
-    // Write file
     let finalKey = filename;
 
     // Custom filename logic if metadata exists
     log('exportMasterReport', `Metadata received:`, metadata);
-    if (metadata?.transactionDate && metadata?.bankName) {
+    if (metadata?.bankName) {
         try {
             log('exportMasterReport', `Formatting filename with:`, metadata);
-            // metadata.transactionDate format: "29/01/2026 12:00:00 AM" or similar
-            // We need "29-01"
-            const parts = metadata.transactionDate.split(/[\s/]/); // Split by space or slash
-            if (parts.length >= 2) {
-                const day = parts[0];
-                const month = parts[1];
+            // Clean bank name: Remove "Ngân hàng " prefix
+            let cleanBank = metadata.bankName.replace(/ngân hàng\s+/i, '').trim();
+            // Or if it starts with "NH ", remove that too
+            cleanBank = cleanBank.replace(/^NH\s+/i, '').trim();
+            // Or if it starts with "Phần mềm " (for Bravo)
+            cleanBank = cleanBank.replace(/^Phần mềm\s+/i, '').trim();
 
-                // Clean bank name: Remove "Ngân hàng " prefix
-                let cleanBank = metadata.bankName.replace(/ngân hàng\s+/i, '').trim();
-                // Or if it starts with "NH ", remove that too
-                cleanBank = cleanBank.replace(/^NH\s+/i, '').trim();
+            // We want to keep "Ví" but remove inner spaces for other bank names.
+            // Example: "Ví PAYOO" -> "VíPAYOO", "Bravo_Ví PAYOO" -> "Bravo_VíPAYOO"
+            // "VietinBank" -> "VietinBank"
+            cleanBank = cleanBank.replace(/\s+/g, '');
 
-                // Construct new filename: "VietinBank_29-01"
-                // Replace spaces in bank name with nothing or keep? User example: "VietinBank" (has no space). 
-                // "Liên Việt" -> "LiênViệt". 
-                cleanBank = cleanBank.replace(/\s+/g, '');
-
-                finalKey = `${cleanBank}_${day}-${month}`;
-                log('exportMasterReport', `Generated Filename: ${finalKey}`);
+            let dateSuffix = '';
+            if (metadata.transactionDate) {
+                const parts = metadata.transactionDate.split(/[\s/]/); // Split by space or slash
+                if (parts.length >= 2) {
+                    const day = parts[0];
+                    const month = parts[1];
+                    dateSuffix = `_${day}-${month}`;
+                }
+            } else {
+                const today = new Date();
+                const d = String(today.getDate()).padStart(2, '0');
+                const m = String(today.getMonth() + 1).padStart(2, '0');
+                dateSuffix = `_${d}-${m}`;
             }
+
+            finalKey = `${cleanBank}${dateSuffix}`;
+            log('exportMasterReport', `Generated Filename: ${finalKey}`);
         } catch (e) {
             console.error("Error formatting filename", e);
+            finalKey = `${filename}_${new Date().toISOString().slice(0, 10)}`;
         }
     } else {
         log('exportMasterReport', 'Missing metadata, using fallback filename.');
