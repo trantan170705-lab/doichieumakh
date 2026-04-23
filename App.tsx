@@ -42,7 +42,7 @@ const App: React.FC = () => {
   const [enrichedDataA, setEnrichedDataA] = useState<EnrichedCodeData[]>([]);
   const [enrichedDataB, setEnrichedDataB] = useState<EnrichedCodeData[]>([]);
 
-  // Store metadata for report filename
+  // Store metadata for report filename, allowing array style merging for dual sources
   const [reportMetadata, setReportMetadata] = useState<{ bankName?: string; transactionDate?: string }>({});
 
   const handleCompare = () => {
@@ -71,16 +71,28 @@ const App: React.FC = () => {
   const handleDataLoadedA = React.useCallback((data: string) => setInputA(data), []);
   const handleEnrichedDataLoadedA = React.useCallback((data: EnrichedCodeData[]) => setEnrichedDataA(data), []);
 
-  // Metadata can come from either file. We merge them, giving priority to existing values so A overrides B?? 
-  // actually usually Bank Statement (B) has the detailed metadata (Date/BankName). Target List (A) might just be codes.
-  // So maybe data from ANY source is good.
-  const handleMetadataLoaded = React.useCallback((meta: { bankName?: string; transactionDate?: string }) => {
-    log('App', `Metadata received:`, meta);
+  const handleMetadataLoadedA = React.useCallback((meta: { bankName?: string; transactionDate?: string }) => {
+    log('App', `Metadata A received:`, meta);
     setReportMetadata(prev => {
-      // Logic fix: Prefer NEW metadata (meta) over old metadata (prev).
-      // This allows replacing the bank name when uploading a new file.
+      let combinedBankName = prev.bankName;
+
+      // If A has a bank name
+      if (meta.bankName) {
+        // If we already have a Bank B name and they are different, combine them.
+        // Otherwise just use A's name
+        if (prev.bankName && prev.bankName !== meta.bankName && !prev.bankName.includes(meta.bankName)) {
+          // If the current combined string already has an underscore, it might be a previous combination.
+          // We'll just append to make it simple: "Bravo_ViPAYOO"
+          // But to be safe, always put A first if we can, or just join unique.
+          const names = new Set([meta.bankName, ...prev.bankName.split('_')]);
+          combinedBankName = Array.from(names).join('_');
+        } else {
+          combinedBankName = meta.bankName;
+        }
+      }
+
       return {
-        bankName: meta.bankName || prev.bankName,
+        bankName: combinedBankName,
         transactionDate: meta.transactionDate || prev.transactionDate
       };
     });
@@ -88,6 +100,27 @@ const App: React.FC = () => {
 
   const handleDataLoadedB = React.useCallback((data: string) => setInputB(data), []);
   const handleEnrichedDataLoadedB = React.useCallback((data: EnrichedCodeData[]) => setEnrichedDataB(data), []);
+
+  const handleMetadataLoadedB = React.useCallback((meta: { bankName?: string; transactionDate?: string }) => {
+    log('App', `Metadata B received:`, meta);
+    setReportMetadata(prev => {
+      let combinedBankName = prev.bankName;
+
+      if (meta.bankName) {
+        if (prev.bankName && prev.bankName !== meta.bankName && !prev.bankName.includes(meta.bankName)) {
+          const names = new Set([...prev.bankName.split('_'), meta.bankName]);
+          combinedBankName = Array.from(names).join('_');
+        } else {
+          combinedBankName = meta.bankName;
+        }
+      }
+
+      return {
+        bankName: combinedBankName,
+        transactionDate: meta.transactionDate || prev.transactionDate
+      };
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -134,7 +167,7 @@ const App: React.FC = () => {
                 key={`A-${uploadKeyA}`}
                 onDataLoaded={handleDataLoadedA}
                 onEnrichedDataLoaded={handleEnrichedDataLoadedA}
-                onMetadataLoaded={handleMetadataLoaded}
+                onMetadataLoaded={handleMetadataLoadedA}
                 label="Nạp File Gốc"
               />
             </div>
@@ -162,9 +195,8 @@ const App: React.FC = () => {
                 key={`B-${uploadKeyB}`}
                 onDataLoaded={handleDataLoadedB}
                 onEnrichedDataLoaded={handleEnrichedDataLoadedB}
-                onMetadataLoaded={handleMetadataLoaded}
+                onMetadataLoaded={handleMetadataLoadedB}
                 label="Nạp File Thực Tế"
-                disableMetadataExtraction={true}
               />
             </div>
             <InputArea
@@ -218,7 +250,7 @@ const App: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-gray-100 max-w-2xl mx-auto">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Hỗ trợ nhận diện tự động:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Sacombank', 'Agribank', 'Ví Payoo', 'Ví VNPT', 'Ví Momo'].map(bank => (
+                {['Bravo', 'VietinBank', 'Vietcombank', 'BIDV', 'LPBank', 'Sacombank', 'Agribank', 'Ví Payoo', 'Ví VNPT', 'Ví Momo'].map(bank => (
                   <span key={bank} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md border border-gray-200">
                     {bank}
                   </span>
