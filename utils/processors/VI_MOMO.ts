@@ -7,7 +7,7 @@ import { safeSheetToJson } from '../excelHelper';
  * Processor for Ví Momo (Excel files)
  * Takes specific columns based on header matching:
  * - MS.Mã đối tác -> Mã KH (Code)
- * - MS.Nợ -> Số tiền (Amount)
+ * - MS.Total Amount -> Số tiền (Amount)
  * - MS.Tên khách hàng -> Diễn giải (Description)
  */
 export const processVIMOMOWorkbook = (wb: XLSX.WorkBook, fileName: string, extractMetadata: boolean = true): SheetInfo[] | null => {
@@ -51,7 +51,7 @@ export const processVIMOMOWorkbook = (wb: XLSX.WorkBook, fileName: string, extra
                     if (cell.includes('ms.mã đối tác') || cell.includes('ms.ma doi tac') || cell === 'mã đối tác' || cell === 'ma doi tac') {
                         codeColIdx = c;
                     }
-                    if (cell === 'ms.nợ' || cell === 'ms.no' || cell === 'nợ' || cell === 'no') {
+                    if (cell === 'ms.total amount' || cell === 'total amount') {
                         amountColIdx = c;
                     }
                     if (cell.includes('ms.tên khách hàng') || cell.includes('ms.ten khach hang') || cell === 'tên khách hàng' || cell === 'ten khach hang') {
